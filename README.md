@@ -32,7 +32,7 @@ OpenProcess, VirtualAllocEx, WriteProcessMemory, for detailed information about 
 * "Execute" threads using QueueUserAPC.
 
 ## Download
-[Windows x64 binary](https://github.com/secrary/InfectPE/releases) - Hardcoded MessageBoxA x-code, only for demos.
+[Windows x64 binary](https://github.com/secrary/InjectProc/releases) - x64 bit DEMO
 ## Dependencies: 
 [vc_redist.x64](https://www.microsoft.com/en-us/download/details.aspx?id=53840) - Microsoft Visual C++ Redistributable
 ## DEMO
