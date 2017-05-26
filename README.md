@@ -31,6 +31,12 @@ OpenProcess, VirtualAllocEx, WriteProcessMemory, for detailed information about 
 * Write code into remote threads.
 * "Execute" threads using QueueUserAPC.
 
+## Download
+[Windows x64 binary](https://github.com/secrary/InfectPE/releases) - Hardcoded MessageBoxA x-code, only for demos.
+## Dependencies: 
+[vc_redist.x64](https://www.microsoft.com/en-us/download/details.aspx?id=53840) - Microsoft Visual C++ Redistributable
+## DEMO
+[InjectProc DEMO - Process Injection Techniques](https://vimeo.com/219083062)
 
 # Warning
 I create this project for me to better understand how process injection works and 
