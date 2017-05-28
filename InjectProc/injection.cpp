@@ -15,7 +15,6 @@
 using namespace std;
 #define DEBUG
 
-// https://blogs.microsoft.co.il/pavely/2017/03/14/injecting-a-dll-without-a-remote-thread/
 
 void DbgPrint(char *msg)
 {
@@ -461,7 +460,6 @@ BOOL ProcessReplacement(TCHAR* target, wstring inj_exe)
 	////////////////////////////////////////////////////////
 
 	CloseHandle(remoteProcessInfo->hProcess); //clean up when you are done, it's only polite.
-	//TerminateProcess(pProcessInfo->hProcess, 0);
 	return TRUE;
 }
 
@@ -492,6 +490,7 @@ BOOL HookInjection(TCHAR target[], TCHAR *dll_name)
 	return TRUE;
 }
 
+// https://blogs.microsoft.co.il/pavely/2017/03/14/injecting-a-dll-without-a-remote-thread/
 BOOL APCinjection(TCHAR target[], TCHAR *dll_name) {
 	TCHAR lpdllpath[MAX_PATH];
 	GetFullPathName(dll_name, MAX_PATH, lpdllpath, nullptr);
