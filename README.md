@@ -38,6 +38,9 @@ OpenProcess, VirtualAllocEx, WriteProcessMemory, for detailed information about 
 ## DEMO
 [InjectProc DEMO - Process Injection Techniques](https://www.youtube.com/watch?v=hLPDq9nSHMw)
 
+## Contributors
+- [nullbites](https://github.com/nullbites)
+
 # Warning
 I create this project for me to better understand how process injection works and 
 I think it will be helpful for many beginner malware analysts too. 
