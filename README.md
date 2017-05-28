@@ -42,5 +42,8 @@ OpenProcess, VirtualAllocEx, WriteProcessMemory, for detailed information about 
 - [nullbites](https://github.com/nullbites)
 
 # Warning
+Works on Windows 10 build 1703, 64bit.
+I've not enough time to test other systems and make it portable if you have enough time please contribute.
+
 I create this project for me to better understand how process injection works and 
 I think it will be helpful for many beginner malware analysts too. 
