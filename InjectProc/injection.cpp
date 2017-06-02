@@ -545,8 +545,9 @@ BOOL HookInjection(TCHAR target[], TCHAR *dll_name)
 
 	typedef LRESULT(WINAPI * MyProc)(int code, WPARAM wp, LPARAM lp); // export from calc_dll.dll
 
-	//auto mp = MyProc(GetProcAddress(hdll, "MyProc"));
-	auto mp = MyProc(GetProcAddress(hdll, "StartW"));
+	auto mp = MyProc(GetProcAddress(hdll, "MyProc"));
+	//auto mp = MyProc(GetProcAddress(hdll, "StartW"));
+	//If you know who uses StartW, hush, its a secret ;)
 
 	auto pStartupInfo = new STARTUPINFO();
 	auto pProcessInfo = new PROCESS_INFORMATION();
