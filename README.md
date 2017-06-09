@@ -34,7 +34,7 @@ OpenProcess, VirtualAllocEx, WriteProcessMemory, for detailed information about 
 ## Download
 [Windows x64 binary](https://github.com/secrary/InjectProc/releases) - x64 bit DEMO
 ## Dependencies: 
-[vc_redist.x64](https://www.microsoft.com/en-us/download/details.aspx?id=53840) - Microsoft Visual C++ Redistributable
+[vc_redist.x64](https://support.microsoft.com/en-us/help/2977003/the-latest-supported-visual-c-downloads) - Microsoft Visual C++ Redistributable
 ## DEMO
 [InjectProc DEMO - Process Injection Techniques](https://www.youtube.com/watch?v=hLPDq9nSHMw)
 
