@@ -25,7 +25,7 @@ OpenProcess, VirtualAllocEx, WriteProcessMemory, for detailed information about 
 * Find/Create process.
 * Set hook
 ## Note: 
-`InjectProc` uses [SetWindowsHookEx](https://msdn.microsoft.com/en-us/library/windows/desktop/ms644990(v=vs.85).aspx) function, you can try different ways to installing hooks, for example [EasyHook](http://easyhook.github.io/tutorials/nativeremotehook.html)
+`InjectProc` uses [SetWindowsHookEx](https://msdn.microsoft.com/en-us/library/windows/desktop/ms644990(v=vs.85).aspx) function, you can try different ways to installing hooks, for example, [EasyHook](http://easyhook.github.io/tutorials/nativeremotehook.html)
 
 ## APC injection:
 * Open process.
