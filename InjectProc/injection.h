@@ -8,7 +8,7 @@ using namespace std;
 
 
 BOOL FindProcess(PCWSTR exeName, DWORD& pid, vector<DWORD>& tids);
-
+VOID DbgPrint(char *msg);
 BOOL Dll_Injection(TCHAR *dll_name, TCHAR processname[]);
 BOOL ProcessReplacement(TCHAR* target, wstring inj_exe);
 BOOL HookInjection(TCHAR target[], TCHAR *dll_name);
