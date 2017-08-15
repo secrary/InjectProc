@@ -12,8 +12,9 @@
 #define RTN_OK 0
 #define RTN_USAGE 1
 #define RTN_ERROR 13
-using namespace std;
+
 #define DEBUG
+using namespace std;
 
 
 VOID DbgPrint(char *msg)

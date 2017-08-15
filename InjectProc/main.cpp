@@ -9,13 +9,12 @@ int main(int argc, char* argv[])
 	USES_CONVERSION;
 	if (argc < 2)
 	{
-		std::cout << "Usage: ./InjectProc.exe <type of injection> <path/to/exe or process_name> <path/to/dll>\n\
-		Example:\n\
+		printf_s( "Usage: ./InjectProc.exe <type of injection> <path/to/exe or process_name> <path/to/dll>\nExample:\n\
 		./InjectProc.exe dll_inj path/to/dll.dll notepad.exe\n\
 		./InjectProc.exe proc_rpl path/to/target/exe path/to/exe\n\
 		./InjectProc.exe hook path/to/target/exe path/to//dll\n\
 		./InjectProc.exe APC target/proc/name path/to/dll\n\
-		";
+		");
 		return EXIT_FAILURE;
 	}
 
@@ -33,7 +32,7 @@ int main(int argc, char* argv[])
 	else if (mode == "APC")
 		APCinjection(A2T(argv[2]), A2T(argv[3]));
 	else {
-		std::cout << "Incorrect mode\n";
+		printf_s("Incorrect mode\n");
 		return EXIT_FAILURE;
 	}
 
