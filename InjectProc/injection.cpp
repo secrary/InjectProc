@@ -163,7 +163,7 @@ BOOL Dll_Injection(TCHAR *dll_name, TCHAR processname[])
 						MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 	if (pNameInVictimProcess == NULL) //Check if allocation failed
 	{
-		DbgPrint("[!] allocation of memory failed, WFT?");
+		DbgPrint("[!] allocation of memory failed");
 		return FALSE;
 	}
 	DbgPrint("[+] allocated memory\n\n");
@@ -187,7 +187,7 @@ BOOL Dll_Injection(TCHAR *dll_name, TCHAR processname[])
 	auto hKernel32 = GetModuleHandle(L"kernel32.dll");
 	if (hKernel32 == NULL)
 	{
-		DbgPrint("[!] Unable to find Kernel32 in process, what the fuck did you do?");
+		DbgPrint("[!] Unable to find Kernel32 in process");
 		return FALSE;
 	}
 	DbgPrint("[+] Got kernel32 handle");
@@ -195,11 +195,11 @@ BOOL Dll_Injection(TCHAR *dll_name, TCHAR processname[])
 	auto LoadLibraryAddress = GetProcAddress(hKernel32, "LoadLibraryW");
 	if (LoadLibraryAddress == NULL)
 	{
-		DbgPrint("[-] Unable to find LoadLibraryW, What is this: Windows 2000?");
+		DbgPrint("[-] Unable to find LoadLibraryW");
 		DbgPrint("[-] Trying LoadLibraryA");
 		if ((LoadLibraryAddress = GetProcAddress(hKernel32, "LoadLibraryA")) == NULL)
 		{
-			DbgPrint("[!] LoadLibraryA failed as well. You're on your own.");
+			DbgPrint("[!] LoadLibraryA failed as well.");
 			return FALSE;
 		}
 	}
@@ -429,7 +429,7 @@ BOOL ProcessReplacement(TCHAR* target, wstring inj_exe)
 	//Create callable version of remote unmap call
 	auto ZwUnmapViewOfSection = reinterpret_cast<_ZwUnmapViewOfSection>(fpZwUnmapViewOfSection);
 
-	//Unmap remote process image (oh boy we are hijacking this shit now!)
+	//Unmap remote process image
 	if (ZwUnmapViewOfSection(remoteProcessInfo->hProcess, const_cast<PVOID>(remoteImageAddressBase)))
 	{
 		DbgPrint("[-] failed to unmap remote process image");
@@ -536,7 +536,6 @@ BOOL ProcessReplacement(TCHAR* target, wstring inj_exe)
 		return FALSE;
 	}
 	DbgPrint("[!] process hijacked!");
-	DbgPrint("===================Et Fin!=========================");
 	  ////////////////////////////////////////////////////////
 	 //////AND THATS IT, WE HAVE HIJACKED A PROCESS!!!!//////
 	////////////////////////////////////////////////////////
